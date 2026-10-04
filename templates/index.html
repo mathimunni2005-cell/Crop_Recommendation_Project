@@ -1,0 +1,323 @@
+<!DOCTYPE html>
+<html>
+<head>
+
+    <title>Crop Recommendation & Profit Analysis</title>
+
+    <style>
+
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f1f8e9;
+            margin: 0;
+            padding: 0;
+        }
+
+        .container {
+            width: 90%;
+            max-width: 900px;
+            margin: 30px auto;
+        }
+
+        h1 {
+            text-align: center;
+            color: #2e7d32;
+        }
+
+        .box {
+            background: white;
+            padding: 25px;
+            border-radius: 12px;
+            margin-top: 20px;
+            box-shadow: 0 3px 10px #ccc;
+        }
+
+        h2 {
+            color: #388e3c;
+        }
+
+        .form-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+        }
+
+        label {
+            font-weight: bold;
+        }
+
+        input {
+            width: 95%;
+            padding: 10px;
+            margin-top: 5px;
+            border: 1px solid #aaa;
+            border-radius: 5px;
+        }
+
+        button {
+            width: 100%;
+            padding: 14px;
+            margin-top: 20px;
+            background-color: #2e7d32;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            font-size: 17px;
+            cursor: pointer;
+        }
+
+        button:hover {
+            background-color: #1b5e20;
+        }
+
+        .result {
+            margin-top: 25px;
+        }
+
+        .result-card {
+            background: #f9fff9;
+            border-left: 5px solid #4caf50;
+            padding: 15px;
+            margin: 10px 0;
+            border-radius: 5px;
+        }
+
+        .profit {
+            background: #e8f5e9;
+            border-left: 5px solid #2e7d32;
+        }
+
+        .loss {
+            background: #ffebee;
+            border-left: 5px solid #d32f2f;
+        }
+
+        .value {
+            font-size: 20px;
+            font-weight: bold;
+        }
+
+        @media (max-width: 600px) {
+
+            .form-grid {
+                grid-template-columns: 1fr;
+            }
+
+        }
+
+    </style>
+
+</head>
+
+<body>
+
+<div class="container">
+
+    <h1>🌾 Crop Recommendation & Profit Analysis</h1>
+
+    <!-- INPUT SECTION -->
+
+    <div class="box">
+
+        <h2>🌱 Enter Farm Details</h2>
+
+        <form method="POST">
+
+            <div class="form-grid">
+
+                <div>
+                    <label>Nitrogen (N)</label>
+                    <input type="number"
+                           name="N"
+                           step="any"
+                           required>
+                </div>
+
+                <div>
+                    <label>Phosphorus (P)</label>
+                    <input type="number"
+                           name="P"
+                           step="any"
+                           required>
+                </div>
+
+                <div>
+                    <label>Potassium (K)</label>
+                    <input type="number"
+                           name="K"
+                           step="any"
+                           required>
+                </div>
+
+                <div>
+                    <label>Temperature (°C)</label>
+                    <input type="number"
+                           name="temperature"
+                           step="any"
+                           required>
+                </div>
+
+                <div>
+                    <label>Humidity (%)</label>
+                    <input type="number"
+                           name="humidity"
+                           step="any"
+                           required>
+                </div>
+
+                <div>
+                    <label>Soil pH</label>
+                    <input type="number"
+                           name="ph"
+                           step="any"
+                           required>
+                </div>
+
+                <div>
+                    <label>Rainfall (mm)</label>
+                    <input type="number"
+                           name="rainfall"
+                           step="any"
+                           required>
+                </div>
+
+                <div>
+                    <label>Land Area (acres)</label>
+                    <input type="number"
+                           name="land_area"
+                           step="0.1"
+                           min="0.1"
+                           required>
+                </div>
+
+            </div>
+
+            <button type="submit">
+                🌱 RECOMMEND CROP & CALCULATE PROFIT
+            </button>
+
+        </form>
+
+    </div>
+
+
+    <!-- RESULT SECTION -->
+
+    {% if result %}
+
+    <div class="box result">
+
+        <h2>📊 Analysis Result</h2>
+
+        <div class="result-card">
+
+            <h3>🌱 Recommended Crop</h3>
+
+            <div class="value">
+                {{ result.crop }}
+            </div>
+
+        </div>
+
+
+        <div class="result-card">
+
+            <h3>🌾 Land Area</h3>
+
+            <div class="value">
+                {{ result.land_area }} acres
+            </div>
+
+        </div>
+
+
+        <div class="result-card">
+
+            <h3>💰 Total Investment</h3>
+
+            <div class="value">
+                ₹{{ "%.2f"|format(result.investment) }}
+            </div>
+
+        </div>
+
+
+        <div class="result-card">
+
+            <h3>🌾 Expected Production</h3>
+
+            <div class="value">
+                {{ "%.2f"|format(result.production) }} quintals
+            </div>
+
+        </div>
+
+
+        <div class="result-card">
+
+            <h3>🏪 Expected Market Price</h3>
+
+            <div class="value">
+                ₹{{ "%.2f"|format(result.market_price) }}
+                / quintal
+            </div>
+
+        </div>
+
+
+        <div class="result-card">
+
+            <h3>💵 Expected Revenue</h3>
+
+            <div class="value">
+                ₹{{ "%.2f"|format(result.revenue) }}
+            </div>
+
+        </div>
+
+
+        {% if result.profit >= 0 %}
+
+        <div class="result-card profit">
+
+            <h3>🟢 Expected Profit</h3>
+
+            <div class="value">
+                ₹{{ "%.2f"|format(result.profit) }}
+            </div>
+
+        </div>
+
+        {% else %}
+
+        <div class="result-card loss">
+
+            <h3>🔴 Expected Loss</h3>
+
+            <div class="value">
+                ₹{{ "%.2f"|format(result.profit|abs) }}
+            </div>
+
+        </div>
+
+        {% endif %}
+
+
+        <div class="result-card">
+
+            <h3>📈 Profit Margin</h3>
+
+            <div class="value">
+                {{ "%.2f"|format(result.margin) }}%
+            </div>
+
+        </div>
+
+    </div>
+
+    {% endif %}
+
+</div>
+
+</body>
+</html>

@@ -1,0 +1,13 @@
+date,state,district,market,commodity,min_price,max_price,modal_price
+2025-01-01,Andhra Pradesh,Guntur,Guntur,Rice,2100,2400,2250
+2025-01-02,Andhra Pradesh,Guntur,Guntur,Rice,2150,2450,2300
+2025-01-03,Andhra Pradesh,Guntur,Guntur,Rice,2200,2500,2350
+2025-01-01,Andhra Pradesh,Guntur,Guntur,Maize,1800,2200,2000
+2025-01-02,Andhra Pradesh,Guntur,Guntur,Maize,1850,2250,2050
+2025-01-03,Andhra Pradesh,Guntur,Guntur,Maize,1900,2300,2100
+2025-01-01,Andhra Pradesh,Guntur,Guntur,Cotton,6500,7200,6850
+2025-01-02,Andhra Pradesh,Guntur,Guntur,Cotton,6600,7300,6950
+2025-01-03,Andhra Pradesh,Guntur,Guntur,Cotton,6700,7400,7050
+2025-01-01,Andhra Pradesh,Guntur,Guntur,Chickpea,4800,5200,5000
+2025-01-02,Andhra Pradesh,Guntur,Guntur,Chickpea,4900,5300,5100
+2025-01-03,Andhra Pradesh,Guntur,Guntur,Chickpea,5000,5400,5200

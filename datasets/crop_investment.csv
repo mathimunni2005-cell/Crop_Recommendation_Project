@@ -1,0 +1,5 @@
+crop,seed_cost,fertilizer_cost,pesticide_cost,labor_cost,irrigation_cost,other_cost,total_cost_per_acre,expected_yield_quintal_per_acre
+Rice,4000,8000,3000,12000,7000,3000,37000,25
+Maize,3000,6000,2500,9000,5000,2500,28000,28
+Cotton,5000,9000,4000,14000,8000,3000,43000,12
+Chickpea,2500,5000,2000,7000,4000,2000,22500,10
