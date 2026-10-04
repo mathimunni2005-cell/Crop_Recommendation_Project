@@ -1,106 +1,414 @@
 <!DOCTYPE html>
 <html>
+
 <head>
 
-    <title>Crop Recommendation & Profit Analysis</title>
+    <title>Smart Crop Recommendation System</title>
+
+    <meta name="viewport"
+          content="width=device-width, initial-scale=1.0">
 
     <style>
 
+        * {
+            box-sizing: border-box;
+        }
+
         body {
+
             font-family: Arial, sans-serif;
-            background-color: #f1f8e9;
+
             margin: 0;
-            padding: 0;
+
+            background:
+            linear-gradient(
+                135deg,
+                #e8f5e9,
+                #f1f8e9
+            );
+
+            color: #263238;
         }
 
         .container {
-            width: 90%;
-            max-width: 900px;
-            margin: 30px auto;
+
+            width: 92%;
+
+            max-width: 1100px;
+
+            margin: 25px auto;
         }
 
         h1 {
+
             text-align: center;
-            color: #2e7d32;
+
+            color: #1b5e20;
+
+            margin-bottom: 8px;
+        }
+
+        .subtitle {
+
+            text-align: center;
+
+            color: #607d8b;
+
+            margin-bottom: 25px;
         }
 
         .box {
+
             background: white;
+
             padding: 25px;
-            border-radius: 12px;
+
+            border-radius: 15px;
+
             margin-top: 20px;
-            box-shadow: 0 3px 10px #ccc;
+
+            box-shadow:
+            0 4px 15px
+            rgba(0,0,0,0.10);
         }
 
         h2 {
+
+            color: #2e7d32;
+
+            margin-top: 0;
+        }
+
+        h3 {
+
             color: #388e3c;
         }
 
         .form-grid {
+
             display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 15px;
+
+            grid-template-columns:
+            1fr 1fr;
+
+            gap: 18px;
         }
 
         label {
+
             font-weight: bold;
+
+            display: block;
+
+            margin-bottom: 5px;
         }
 
         input {
-            width: 95%;
-            padding: 10px;
-            margin-top: 5px;
-            border: 1px solid #aaa;
-            border-radius: 5px;
+
+            width: 100%;
+
+            padding: 12px;
+
+            border: 1px solid #bdbdbd;
+
+            border-radius: 7px;
+
+            font-size: 15px;
+        }
+
+        input:focus {
+
+            outline: none;
+
+            border-color: #43a047;
         }
 
         button {
+
             width: 100%;
-            padding: 14px;
-            margin-top: 20px;
-            background-color: #2e7d32;
+
+            padding: 15px;
+
+            margin-top: 25px;
+
+            background: #2e7d32;
+
             color: white;
+
             border: none;
-            border-radius: 6px;
+
+            border-radius: 8px;
+
             font-size: 17px;
+
+            font-weight: bold;
+
             cursor: pointer;
         }
 
         button:hover {
-            background-color: #1b5e20;
+
+            background: #1b5e20;
         }
 
-        .result {
-            margin-top: 25px;
+        /* ===================================
+           MAIN RESULT GRID
+        =================================== */
+
+        .analysis-grid {
+
+            display: grid;
+
+            grid-template-columns:
+            1fr 1fr;
+
+            gap: 20px;
+
+            margin-top: 20px;
         }
 
         .result-card {
+
             background: #f9fff9;
-            border-left: 5px solid #4caf50;
-            padding: 15px;
+
+            border-left:
+            5px solid #4caf50;
+
+            padding: 18px;
+
+            border-radius: 8px;
+
             margin: 10px 0;
-            border-radius: 5px;
         }
 
-        .profit {
-            background: #e8f5e9;
-            border-left: 5px solid #2e7d32;
+        .recommended {
+
+            background:
+            linear-gradient(
+                135deg,
+                #e8f5e9,
+                #f1f8e9
+            );
+
+            border-left:
+            7px solid #2e7d32;
+
+            text-align: center;
         }
 
-        .loss {
-            background: #ffebee;
-            border-left: 5px solid #d32f2f;
+        .crop-name {
+
+            font-size: 32px;
+
+            font-weight: bold;
+
+            color: #1b5e20;
+
+            text-transform: uppercase;
         }
 
-        .value {
-            font-size: 20px;
+        .confidence {
+
+            font-size: 18px;
+
+            color: #616161;
+
+            margin-top: 8px;
+        }
+
+        /* ===================================
+           TOP 3 CROPS
+        =================================== */
+
+        .crop-option {
+
+            display: flex;
+
+            justify-content:
+            space-between;
+
+            align-items: center;
+
+            background: white;
+
+            border: 1px solid #ddd;
+
+            padding: 12px;
+
+            margin: 8px 0;
+
+            border-radius: 8px;
+        }
+
+        .crop-option:first-child {
+
+            border-left:
+            5px solid #2e7d32;
+        }
+
+        .crop-percent {
+
+            font-weight: bold;
+
+            color: #2e7d32;
+        }
+
+        /* ===================================
+           SHAP SECTION
+        =================================== */
+
+        .shap-box {
+
+            background: #fafafa;
+
+            border-left:
+            5px solid #1565c0;
+
+            padding: 18px;
+
+            border-radius: 8px;
+
+            margin-top: 20px;
+        }
+
+        .shap-row {
+
+            margin: 14px 0;
+        }
+
+        .shap-header {
+
+            display: flex;
+
+            justify-content:
+            space-between;
+
+            font-size: 14px;
+
+            margin-bottom: 5px;
+        }
+
+        .bar-background {
+
+            width: 100%;
+
+            height: 14px;
+
+            background: #e0e0e0;
+
+            border-radius: 10px;
+
+            overflow: hidden;
+        }
+
+        .bar {
+
+            height: 14px;
+
+            background: #43a047;
+
+            border-radius: 10px;
+
+            width: 100%;
+        }
+
+        .positive {
+
+            color: #2e7d32;
+
             font-weight: bold;
         }
 
-        @media (max-width: 600px) {
+        .negative {
+
+            color: #c62828;
+
+            font-weight: bold;
+        }
+
+        /* ===================================
+           EXPLANATION
+        =================================== */
+
+        .explanation {
+
+            background: #e3f2fd;
+
+            border-left:
+            5px solid #1976d2;
+
+            padding: 18px;
+
+            border-radius: 8px;
+
+            margin-top: 20px;
+        }
+
+        .explanation li {
+
+            margin: 10px 0;
+        }
+
+        /* ===================================
+           PROFIT
+        =================================== */
+
+        .profit {
+
+            background: #e8f5e9;
+
+            border-left:
+            5px solid #2e7d32;
+        }
+
+        .loss {
+
+            background: #ffebee;
+
+            border-left:
+            5px solid #d32f2f;
+        }
+
+        .value {
+
+            font-size: 22px;
+
+            font-weight: bold;
+        }
+
+        .footer-note {
+
+            text-align: center;
+
+            color: #78909c;
+
+            margin: 25px 0;
+        }
+
+        /* ===================================
+           MOBILE
+        =================================== */
+
+        @media (max-width: 700px) {
 
             .form-grid {
+
                 grid-template-columns: 1fr;
+            }
+
+            .analysis-grid {
+
+                grid-template-columns: 1fr;
+            }
+
+            .container {
+
+                width: 95%;
+            }
+
+            .crop-name {
+
+                font-size: 27px;
             }
 
         }
@@ -109,13 +417,26 @@
 
 </head>
 
+
 <body>
 
 <div class="container">
 
-    <h1>🌾 Crop Recommendation & Profit Analysis</h1>
+    <h1>
+        🌾 Smart Crop Recommendation System
+    </h1>
 
-    <!-- INPUT SECTION -->
+    <div class="subtitle">
+
+        AI-Based Crop Selection with
+        SHAP Explainable AI & Profit Analysis
+
+    </div>
+
+
+    <!-- =================================
+         INPUT SECTION
+    ================================== -->
 
     <div class="box">
 
@@ -126,74 +447,132 @@
             <div class="form-grid">
 
                 <div>
-                    <label>Nitrogen (N)</label>
-                    <input type="number"
-                           name="N"
-                           step="any"
-                           required>
+
+                    <label>
+                        Nitrogen (N)
+                    </label>
+
+                    <input
+                        type="number"
+                        name="N"
+                        step="any"
+                        required>
+
                 </div>
 
-                <div>
-                    <label>Phosphorus (P)</label>
-                    <input type="number"
-                           name="P"
-                           step="any"
-                           required>
-                </div>
 
                 <div>
-                    <label>Potassium (K)</label>
-                    <input type="number"
-                           name="K"
-                           step="any"
-                           required>
+
+                    <label>
+                        Phosphorus (P)
+                    </label>
+
+                    <input
+                        type="number"
+                        name="P"
+                        step="any"
+                        required>
+
                 </div>
 
-                <div>
-                    <label>Temperature (°C)</label>
-                    <input type="number"
-                           name="temperature"
-                           step="any"
-                           required>
-                </div>
 
                 <div>
-                    <label>Humidity (%)</label>
-                    <input type="number"
-                           name="humidity"
-                           step="any"
-                           required>
+
+                    <label>
+                        Potassium (K)
+                    </label>
+
+                    <input
+                        type="number"
+                        name="K"
+                        step="any"
+                        required>
+
                 </div>
 
-                <div>
-                    <label>Soil pH</label>
-                    <input type="number"
-                           name="ph"
-                           step="any"
-                           required>
-                </div>
 
                 <div>
-                    <label>Rainfall (mm)</label>
-                    <input type="number"
-                           name="rainfall"
-                           step="any"
-                           required>
+
+                    <label>
+                        Temperature (°C)
+                    </label>
+
+                    <input
+                        type="number"
+                        name="temperature"
+                        step="any"
+                        required>
+
                 </div>
 
+
                 <div>
-                    <label>Land Area (acres)</label>
-                    <input type="number"
-                           name="land_area"
-                           step="0.1"
-                           min="0.1"
-                           required>
+
+                    <label>
+                        Humidity (%)
+                    </label>
+
+                    <input
+                        type="number"
+                        name="humidity"
+                        step="any"
+                        required>
+
+                </div>
+
+
+                <div>
+
+                    <label>
+                        Soil pH
+                    </label>
+
+                    <input
+                        type="number"
+                        name="ph"
+                        step="any"
+                        required>
+
+                </div>
+
+
+                <div>
+
+                    <label>
+                        Rainfall (mm)
+                    </label>
+
+                    <input
+                        type="number"
+                        name="rainfall"
+                        step="any"
+                        required>
+
+                </div>
+
+
+                <div>
+
+                    <label>
+                        Land Area (acres)
+                    </label>
+
+                    <input
+                        type="number"
+                        name="land_area"
+                        step="0.1"
+                        min="0.1"
+                        required>
+
                 </div>
 
             </div>
 
+
             <button type="submit">
-                🌱 RECOMMEND CROP & CALCULATE PROFIT
+
+                🌱 RECOMMEND CROP & ANALYZE
+
             </button>
 
         </form>
@@ -201,123 +580,394 @@
     </div>
 
 
-    <!-- RESULT SECTION -->
-
     {% if result %}
 
-    <div class="box result">
 
-        <h2>📊 Analysis Result</h2>
+    <!-- =================================
+         CROP RESULT
+    ================================== -->
 
-        <div class="result-card">
+    <div class="box">
 
-            <h3>🌱 Recommended Crop</h3>
+        <h2>
+            🎯 Crop Selection Result
+        </h2>
 
-            <div class="value">
-                {{ result.crop }}
+
+        <div class="analysis-grid">
+
+
+            <!-- RECOMMENDED CROP -->
+
+            <div>
+
+                <div class="result-card recommended">
+
+                    <h3>
+                        🌱 Recommended Crop
+                    </h3>
+
+                    <div class="crop-name">
+
+                        {{ result.crop }}
+
+                    </div>
+
+                    <div class="confidence">
+
+                        Model Confidence:
+                        <strong>
+                            {{ result.confidence }}%
+                        </strong>
+
+                    </div>
+
+                </div>
+
+            </div>
+
+
+            <!-- TOP 3 -->
+
+            <div>
+
+                <div class="result-card">
+
+                    <h3>
+                        🏆 Top Crop Selection
+                    </h3>
+
+
+                    {% for item in result.top_crops %}
+
+                    <div class="crop-option">
+
+                        <span>
+
+                            {% if loop.index == 1 %}
+                                🥇
+                            {% elif loop.index == 2 %}
+                                🥈
+                            {% else %}
+                                🥉
+                            {% endif %}
+
+                            {{ item.crop }}
+
+                        </span>
+
+                        <span class="crop-percent">
+
+                            {{ item.probability }}%
+
+                        </span>
+
+                    </div>
+
+                    {% endfor %}
+
+                </div>
+
             </div>
 
         </div>
 
 
-        <div class="result-card">
+        <!-- =================================
+             WHY CROP RECOMMENDED
+        ================================== -->
 
-            <h3>🌾 Land Area</h3>
+        <div class="explanation">
 
-            <div class="value">
-                {{ result.land_area }} acres
-            </div>
+            <h3>
+                🔍 Why was {{ result.crop }} recommended?
+            </h3>
 
-        </div>
+            <p>
 
+                The Random Forest model analyzed
+                the farm's soil and environmental
+                conditions. SHAP was used to identify
+                which features contributed most to
+                the prediction.
 
-        <div class="result-card">
+            </p>
 
-            <h3>💰 Total Investment</h3>
+            <ul>
 
-            <div class="value">
-                ₹{{ "%.2f"|format(result.investment) }}
-            </div>
+                {% for point in result.explanation_points %}
 
-        </div>
+                <li>
+                    {{ point }}
+                </li>
 
+                {% endfor %}
 
-        <div class="result-card">
-
-            <h3>🌾 Expected Production</h3>
-
-            <div class="value">
-                {{ "%.2f"|format(result.production) }} quintals
-            </div>
-
-        </div>
-
-
-        <div class="result-card">
-
-            <h3>🏪 Expected Market Price</h3>
-
-            <div class="value">
-                ₹{{ "%.2f"|format(result.market_price) }}
-                / quintal
-            </div>
+            </ul>
 
         </div>
 
 
-        <div class="result-card">
+        <!-- =================================
+             SHAP FEATURE IMPORTANCE
+        ================================== -->
 
-            <h3>💵 Expected Revenue</h3>
+        <div class="shap-box">
 
-            <div class="value">
-                ₹{{ "%.2f"|format(result.revenue) }}
+            <h3>
+                📊 SHAP Feature Explanation
+            </h3>
+
+            <p>
+
+                Higher SHAP importance means that
+                the feature had a stronger influence
+                on the crop prediction.
+
+            </p>
+
+
+            {% for item in result.shap_data %}
+
+            <div class="shap-row">
+
+                <div class="shap-header">
+
+                    <span>
+
+                        <strong>
+                            {{ item.feature }}
+                        </strong>
+
+                        = {{ item.value }}
+
+                    </span>
+
+                    <span>
+
+                        SHAP:
+                        {{ "%.4f"|format(item.shap) }}
+
+                    </span>
+
+                </div>
+
+            <div class="bar-background">
+
+                <div class="bar"
+                     data-width="{{ ((item.abs_shap / result.shap_data[0].abs_shap) * 100) if result.shap_data[0].abs_shap > 0 else 0 }}">
+                </div>
+
             </div>
+                {% if item.shap > 0 %}
+
+                <small class="positive">
+
+                    ↑ Supported the recommendation
+
+                </small>
+
+                {% elif item.shap < 0 %}
+
+                <small class="negative">
+
+                    ↓ Reduced the influence
+
+                </small>
+
+                {% else %}
+
+                <small>
+
+                    → Very little influence
+
+                </small>
+
+                {% endif %}
+
+            </div>
+
+            {% endfor %}
 
         </div>
 
 
-        {% if result.profit >= 0 %}
+        <!-- =================================
+             PROFIT ANALYSIS
+        ================================== -->
 
-        <div class="result-card profit">
+        <div class="box">
 
-            <h3>🟢 Expected Profit</h3>
+            <h2>
+                💰 Investment & Profit Analysis
+            </h2>
 
-            <div class="value">
-                ₹{{ "%.2f"|format(result.profit) }}
+
+            <div class="analysis-grid">
+
+
+                <div class="result-card">
+
+                    <h3>
+                        🌾 Land Area
+                    </h3>
+
+                    <div class="value">
+
+                        {{ result.land_area }}
+                        acres
+
+                    </div>
+
+                </div>
+
+
+                <div class="result-card">
+
+                    <h3>
+                        💰 Total Investment
+                    </h3>
+
+                    <div class="value">
+
+                        ₹{{ "%.2f"|
+                        format(result.investment) }}
+
+                    </div>
+
+                </div>
+
+
+                <div class="result-card">
+
+                    <h3>
+                        🌾 Expected Production
+                    </h3>
+
+                    <div class="value">
+
+                        {{ "%.2f"|
+                        format(result.production) }}
+                        quintals
+
+                    </div>
+
+                </div>
+
+
+                <div class="result-card">
+
+                    <h3>
+                        🏪 Expected Market Price
+                    </h3>
+
+                    <div class="value">
+
+                        ₹{{ "%.2f"|
+                        format(result.market_price) }}
+
+                        / quintal
+
+                    </div>
+
+                </div>
+
+
+                <div class="result-card">
+
+                    <h3>
+                        💵 Expected Revenue
+                    </h3>
+
+                    <div class="value">
+
+                        ₹{{ "%.2f"|
+                        format(result.revenue) }}
+
+                    </div>
+
+                </div>
+
+
+                {% if result.profit >= 0 %}
+
+                <div class="result-card profit">
+
+                    <h3>
+                        🟢 Expected Profit
+                    </h3>
+
+                    <div class="value">
+
+                        ₹{{ "%.2f"|
+                        format(result.profit) }}
+
+                    </div>
+
+                </div>
+
+                {% else %}
+
+                <div class="result-card loss">
+
+                    <h3>
+                        🔴 Expected Loss
+                    </h3>
+
+                    <div class="value">
+
+                        ₹{{ "%.2f"|
+                        format(result.profit|abs) }}
+
+                    </div>
+
+                </div>
+
+                {% endif %}
+
+
+                <div class="result-card">
+
+                    <h3>
+                        📈 Profit Margin
+                    </h3>
+
+                    <div class="value">
+
+                        {{ "%.2f"|
+                        format(result.margin) }}%
+
+                    </div>
+
+                </div>
+
             </div>
 
         </div>
 
-        {% else %}
-
-        <div class="result-card loss">
-
-            <h3>🔴 Expected Loss</h3>
-
-            <div class="value">
-                ₹{{ "%.2f"|format(result.profit|abs) }}
-            </div>
-
-        </div>
-
-        {% endif %}
-
-
-        <div class="result-card">
-
-            <h3>📈 Profit Margin</h3>
-
-            <div class="value">
-                {{ "%.2f"|format(result.margin) }}%
-            </div>
-
-        </div>
 
     </div>
 
     {% endif %}
 
+
+    <div class="footer-note">
+
+        🌱 AI-Based Agriculture Decision Support System
+
+        <br>
+
+        Random Forest + SHAP Explainable AI
+
+    </div>
+
 </div>
+<script>
+document.querySelectorAll(".bar").forEach(function(bar) {
+    bar.style.width = bar.dataset.width + "%";
+});
+</script>
 
 </body>
+
 </html>
