@@ -1,18 +1,38 @@
 from flask import Flask, render_template, request
 import pandas as pd
 import numpy as np
-from sklearn.ensemble import RandomForestClassifier
-import shap
+import joblib
+from tensorflow.keras.models import load_model
 
 app = Flask(__name__)
 
 # ==========================================================
-# LOAD CROP DATASET
+# LOAD TRAINED LSTM MODEL
 # ==========================================================
 
-crop_data = pd.read_csv(
-    "datasets/crop_recommendation.csv"
+model = load_model(
+    "models/crop_lstm.keras"
 )
+
+# ==========================================================
+# LOAD SCALER
+# ==========================================================
+
+scaler = joblib.load(
+    "models/scaler.pkl"
+)
+
+# ==========================================================
+# LOAD LABEL ENCODER
+# ==========================================================
+
+label_encoder = joblib.load(
+    "models/label_encoder.pkl"
+)
+
+# ==========================================================
+# FEATURES
+# ==========================================================
 
 features = [
     "N",
@@ -24,25 +44,7 @@ features = [
     "rainfall"
 ]
 
-X = crop_data[features]
-y = crop_data["label"]
-
-# ==========================================================
-# TRAIN RANDOM FOREST MODEL
-# ==========================================================
-
-model = RandomForestClassifier(
-    n_estimators=100,
-    random_state=42
-)
-
-model.fit(X, y)
-
-# ==========================================================
-# SHAP EXPLAINER
-# ==========================================================
-
-explainer = shap.TreeExplainer(model)
+SEQUENCE_LENGTH = 3
 
 # ==========================================================
 # LOAD INVESTMENT DATASET
@@ -117,26 +119,75 @@ def home():
         )
 
         # ==================================================
-        # CROP PREDICTION
+        # SCALE INPUT
         # ==================================================
 
-        recommended_crop = model.predict(
+        input_scaled = scaler.transform(
             input_df
-        )[0]
-
-        # ==================================================
-        # TOP 3 CROP SELECTION
-        # ==================================================
-
-        probabilities = model.predict_proba(
-            input_df
-        )[0]
-
-        classes = model.classes_
-
-        probability_data = list(
-            zip(classes, probabilities)
         )
+
+        # ==================================================
+        # CREATE LSTM SEQUENCE
+        # ==================================================
+        #
+        # The trained model expects:
+        # (samples, 3 time steps, 7 features)
+        #
+        # For a single farmer input, we repeat the
+        # current conditions for the 3 required steps.
+        #
+
+        sequence = np.repeat(
+            input_scaled[:, np.newaxis, :],
+            SEQUENCE_LENGTH,
+            axis=1
+        )
+
+        # ==================================================
+        # LSTM PREDICTION
+        # ==================================================
+
+        probabilities = model.predict(
+            sequence,
+            verbose=0
+        )[0]
+
+        # ==================================================
+        # GET PREDICTED CROP
+        # ==================================================
+
+        predicted_index = np.argmax(
+            probabilities
+        )
+
+        recommended_crop = (
+            label_encoder.inverse_transform(
+                [predicted_index]
+            )[0]
+        )
+
+        # ==================================================
+        # TOP 3 CROPS
+        # ==================================================
+
+        probability_data = []
+
+        for index, probability in enumerate(
+            probabilities
+        ):
+
+            crop_name = (
+                label_encoder.inverse_transform(
+                    [index]
+                )[0]
+            )
+
+            probability_data.append(
+                (
+                    crop_name,
+                    float(probability)
+                )
+            )
 
         probability_data.sort(
             key=lambda x: x[1],
@@ -148,117 +199,126 @@ def home():
         for crop, probability in probability_data[:3]:
 
             top_crops.append({
+
                 "crop": crop,
+
                 "probability": round(
                     probability * 100,
                     2
                 )
+
             })
 
         # ==================================================
-        # SHAP EXPLANATION
+        # LSTM FEATURE EXPLANATION
         # ==================================================
+        #
+        # This is a simple human-readable explanation.
+        # Tree SHAP is NOT used because the model is LSTM.
+        #
 
-        shap_values = explainer.shap_values(
-            input_df
+        feature_values = input_df.iloc[0].to_dict()
+
+        # Crop-specific approximate comparison
+        crop_rows = crop_data = pd.read_csv(
+            "datasets/crop_recommendation.csv"
         )
 
-        predicted_class_index = list(
-            model.classes_
-        ).index(recommended_crop)
+        crop_reference = crop_rows[
+            crop_rows["label"].str.lower()
+            == recommended_crop.lower()
+        ]
 
-        # Handle different SHAP output formats
-        if isinstance(shap_values, list):
+        explanation_data = []
 
-            crop_shap_values = np.array(
-                shap_values[predicted_class_index][0]
+        if not crop_reference.empty:
+
+            reference_mean = (
+                crop_reference[features]
+                .mean()
             )
+
+            for feature in features:
+
+                user_value = float(
+                    feature_values[feature]
+                )
+
+                reference_value = float(
+                    reference_mean[feature]
+                )
+
+                difference = abs(
+                    user_value
+                    - reference_value
+                )
+
+                explanation_data.append({
+
+                    "feature": feature,
+
+                    "value": round(
+                        user_value,
+                        2
+                    ),
+
+                    "reference": round(
+                        reference_value,
+                        2
+                    ),
+
+                    "difference": round(
+                        difference,
+                        2
+                    )
+
+                })
 
         else:
 
-            shap_array = np.array(
-                shap_values
-            )
+            for feature in features:
 
-            if shap_array.ndim == 3:
+                explanation_data.append({
 
-                crop_shap_values = shap_array[
-                    0,
-                    :,
-                    predicted_class_index
-                ]
+                    "feature": feature,
 
-            elif shap_array.ndim == 2:
+                    "value": round(
+                        float(
+                            feature_values[feature]
+                        ),
+                        2
+                    ),
 
-                crop_shap_values = shap_array[0]
+                    "reference": 0,
 
-            else:
+                    "difference": 0
 
-                crop_shap_values = shap_array
+                })
 
         # ==================================================
-        # CREATE SHAP FEATURE DATA
+        # SORT FEATURES
         # ==================================================
 
-        shap_data = []
-
-        for feature, value, shap_value in zip(
-            features,
-            input_df.iloc[0],
-            crop_shap_values
-        ):
-
-            shap_data.append({
-                "feature": feature,
-                "value": round(
-                    float(value),
-                    2
-                ),
-                "shap": round(
-                    float(shap_value),
-                    4
-                ),
-                "abs_shap": abs(
-                    float(shap_value)
-                )
-            })
-
-        # Sort by importance
-        shap_data.sort(
-            key=lambda x: x["abs_shap"],
-            reverse=True
+        explanation_data.sort(
+            key=lambda x: x["difference"]
         )
 
         # ==================================================
-        # CREATE HUMAN READABLE EXPLANATION
+        # HUMAN READABLE EXPLANATION
         # ==================================================
-
-        top_explanations = shap_data[:4]
 
         explanation_points = []
 
-        for item in top_explanations:
+        for item in explanation_data[:4]:
 
-            if item["shap"] > 0:
+            explanation_points.append(
 
-                explanation_points.append(
-                    f'{item["feature"]} ({item["value"]}) '
-                    f'supported the recommendation'
-                )
+                f'{item["feature"]} value '
+                f'{item["value"]} is close to the '
+                f'recommended {recommended_crop} '
+                f'conditions.'
 
-            elif item["shap"] < 0:
-
-                explanation_points.append(
-                    f'{item["feature"]} ({item["value"]}) '
-                    f'had a lower influence on the recommendation'
-                )
-
-            else:
-
-                explanation_points.append(
-                    f'{item["feature"]} ({item["value"]}) '
-                    f'had very little influence'
-                )
+            )
 
         # ==================================================
         # INVESTMENT DETAILS
@@ -298,8 +358,11 @@ def home():
         else:
 
             cost_per_acre = 0
+
             yield_per_acre = 0
+
             total_investment = 0
+
             expected_production = 0
 
         # ==================================================
@@ -322,7 +385,7 @@ def home():
             market_price = 0
 
         # ==================================================
-        # PROFIT CALCULATION
+        # REVENUE
         # ==================================================
 
         expected_revenue = (
@@ -330,10 +393,18 @@ def home():
             * market_price
         )
 
+        # ==================================================
+        # PROFIT
+        # ==================================================
+
         expected_profit = (
             expected_revenue
             - total_investment
         )
+
+        # ==================================================
+        # PROFIT MARGIN
+        # ==================================================
 
         if total_investment > 0:
 
@@ -352,20 +423,22 @@ def home():
 
         result = {
 
-            "crop": recommended_crop,
+            "crop":
+                recommended_crop,
 
-            "confidence": round(
-                probabilities[
-                    list(classes).index(
-                        recommended_crop
-                    )
-                ] * 100,
-                2
-            ),
+            "confidence":
+                round(
+                    probabilities[
+                        predicted_index
+                    ] * 100,
+                    2
+                ),
 
-            "top_crops": top_crops,
+            "top_crops":
+                top_crops,
 
-            "shap_data": shap_data,
+            "shap_data":
+                explanation_data,
 
             "explanation_points":
                 explanation_points,
@@ -405,9 +478,15 @@ def home():
 if __name__ == "__main__":
 
     print("--------------------------------")
-    print("CROP RECOMMENDATION SYSTEM")
-    print("SHAP EXPLAINABLE AI")
-    print("INVESTMENT & PROFIT ANALYSIS")
+
+    print(
+        "LSTM CROP RECOMMENDATION SYSTEM"
+    )
+
+    print(
+        "INVESTMENT & PROFIT ANALYSIS"
+    )
+
     print("--------------------------------")
 
     print(
