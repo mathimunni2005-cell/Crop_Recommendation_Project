@@ -1,9 +1,10 @@
 import os
 
-# ==========================================================
-# RENDER / CPU MEMORY OPTIMIZATION
-# ==========================================================
+# ============================================================
+# RENDER / TENSORFLOW RESOURCE SETTINGS
+# ============================================================
 
+os.environ["TF_CPP_MIN_LOG_LEVEL"] = "2"
 os.environ["TF_NUM_INTRAOP_THREADS"] = "1"
 os.environ["TF_NUM_INTEROP_THREADS"] = "1"
 os.environ["OMP_NUM_THREADS"] = "1"
@@ -12,52 +13,22 @@ from flask import Flask, render_template, request
 import pandas as pd
 import numpy as np
 import joblib
-import tensorflow as tf
-from tensorflow.keras.models import load_model
-
-
-# ==========================================================
-# TENSORFLOW THREAD SETTINGS
-# ==========================================================
-
-tf.config.threading.set_intra_op_parallelism_threads(1)
-tf.config.threading.set_inter_op_parallelism_threads(1)
-
 
 app = Flask(__name__)
 
 
-# ==========================================================
-# LOAD TRAINED LSTM MODEL
-# ==========================================================
+# ============================================================
+# FILE PATHS
+# ============================================================
 
-model = load_model(
-    "models/crop_lstm.keras",
-    compile=False
-)
-
-
-# ==========================================================
-# LOAD SCALER
-# ==========================================================
-
-scaler = joblib.load(
-    "models/scaler.pkl"
-)
+MODEL_PATH = "models/crop_lstm.keras"
+SCALER_PATH = "models/scaler.pkl"
+ENCODER_PATH = "models/label_encoder.pkl"
 
 
-# ==========================================================
-# LOAD LABEL ENCODER
-# ==========================================================
-
-label_encoder = joblib.load(
-    "models/label_encoder.pkl"
-)
-
-
-# ==========================================================
+# ============================================================
 # FEATURES
-# ==========================================================
+# ============================================================
 
 features = [
     "N",
@@ -72,487 +43,493 @@ features = [
 SEQUENCE_LENGTH = 3
 
 
-# ==========================================================
-# LOAD INVESTMENT DATASET
-# ==========================================================
+# ============================================================
+# LOAD DATASETS
+# ============================================================
 
 investment_data = pd.read_csv(
     "datasets/crop_investment.csv"
 )
 
-
-# ==========================================================
-# LOAD MARKET PRICE DATASET
-# ==========================================================
-
 market_data = pd.read_csv(
     "datasets/market_prices.csv"
 )
 
+recommendation_data = pd.read_csv(
+    "datasets/crop_recommendation.csv"
+)
 
-# ==========================================================
+
+# ============================================================
+# LAZY LOAD AI MODEL
+# ============================================================
+
+model = None
+scaler = None
+label_encoder = None
+
+
+def load_ai_model():
+
+    global model
+    global scaler
+    global label_encoder
+
+    if model is None:
+
+        print("Loading TensorFlow LSTM model...")
+
+        import tensorflow as tf
+
+        tf.config.threading.set_intra_op_parallelism_threads(1)
+        tf.config.threading.set_inter_op_parallelism_threads(1)
+
+        from tensorflow.keras.models import load_model
+
+        model = load_model(
+            MODEL_PATH,
+            compile=False
+        )
+
+        scaler = joblib.load(
+            SCALER_PATH
+        )
+
+        label_encoder = joblib.load(
+            ENCODER_PATH
+        )
+
+        print("LSTM model loaded successfully.")
+
+
+# ============================================================
 # HOME PAGE
-# ==========================================================
+# ============================================================
 
 @app.route("/", methods=["GET", "POST"])
 def home():
 
     result = None
+    error = None
 
     if request.method == "POST":
 
-        # ==================================================
-        # FARMER INPUT
-        # ==================================================
+        try:
 
-        N = float(request.form["N"])
-        P = float(request.form["P"])
-        K = float(request.form["K"])
+            # ------------------------------------------------
+            # LOAD MODEL
+            # ------------------------------------------------
 
-        temperature = float(
-            request.form["temperature"]
-        )
-
-        humidity = float(
-            request.form["humidity"]
-        )
-
-        ph = float(
-            request.form["ph"]
-        )
-
-        rainfall = float(
-            request.form["rainfall"]
-        )
-
-        land_area = float(
-            request.form["land_area"]
-        )
+            load_ai_model()
 
 
-        # ==================================================
-        # CREATE INPUT DATAFRAME
-        # ==================================================
+            # ------------------------------------------------
+            # GET USER INPUT
+            # ------------------------------------------------
 
-        input_df = pd.DataFrame(
-            [[
-                N,
-                P,
-                K,
-                temperature,
-                humidity,
-                ph,
-                rainfall
-            ]],
-            columns=features
-        )
+            N = float(
+                request.form["N"]
+            )
 
+            P = float(
+                request.form["P"]
+            )
 
-        # ==================================================
-        # SCALE INPUT
-        # ==================================================
-        # .values removes the sklearn feature-name warning
-        # ==================================================
+            K = float(
+                request.form["K"]
+            )
 
-        input_scaled = scaler.transform(
-            input_df.values
-        )
+            temperature = float(
+                request.form["temperature"]
+            )
 
+            humidity = float(
+                request.form["humidity"]
+            )
 
-        # ==================================================
-        # CREATE LSTM SEQUENCE
-        # ==================================================
+            ph = float(
+                request.form["ph"]
+            )
 
-        sequence = np.repeat(
-            input_scaled[:, np.newaxis, :],
-            SEQUENCE_LENGTH,
-            axis=1
-        )
+            rainfall = float(
+                request.form["rainfall"]
+            )
+
+            land_area = float(
+                request.form["land_area"]
+            )
 
 
-        # ==================================================
-        # LSTM PREDICTION
-        # ==================================================
+            # ------------------------------------------------
+            # CREATE INPUT DATAFRAME
+            # ------------------------------------------------
 
-        probabilities = model.predict(
-            sequence,
-            verbose=0
-        )[0]
+            input_df = pd.DataFrame(
+                [[
+                    N,
+                    P,
+                    K,
+                    temperature,
+                    humidity,
+                    ph,
+                    rainfall
+                ]],
+                columns=features
+            )
 
 
-        # ==================================================
-        # GET PREDICTED CROP
-        # ==================================================
+            # ------------------------------------------------
+            # SCALE INPUT
+            # ------------------------------------------------
 
-        predicted_index = np.argmax(
-            probabilities
-        )
+            input_scaled = scaler.transform(
+                input_df
+            )
 
-        recommended_crop = (
-            label_encoder.inverse_transform(
-                [predicted_index]
+
+            # ------------------------------------------------
+            # CREATE LSTM SEQUENCE
+            # ------------------------------------------------
+
+            sequence = np.repeat(
+                input_scaled[:, np.newaxis, :],
+                SEQUENCE_LENGTH,
+                axis=1
+            )
+
+
+            # ------------------------------------------------
+            # LSTM PREDICTION
+            # ------------------------------------------------
+
+            probabilities = model.predict(
+                sequence,
+                verbose=0
             )[0]
-        )
 
 
-        # ==================================================
-        # TOP 3 CROPS
-        # ==================================================
+            # ------------------------------------------------
+            # TOP 3 CROPS
+            # ------------------------------------------------
 
-        probability_data = []
+            top_indices = np.argsort(
+                probabilities
+            )[::-1][:3]
 
-        for index, probability in enumerate(
-            probabilities
-        ):
+            top_crops = []
 
-            crop_name = (
-                label_encoder.inverse_transform(
+            for index in top_indices:
+
+                crop_name = label_encoder.inverse_transform(
                     [index]
                 )[0]
-            )
 
-            probability_data.append(
-                (
-                    crop_name,
-                    float(probability)
-                )
-            )
-
-
-        probability_data.sort(
-            key=lambda x: x[1],
-            reverse=True
-        )
-
-
-        top_crops = []
-
-        for crop, probability in probability_data[:3]:
-
-            top_crops.append({
-
-                "crop": crop,
-
-                "probability": round(
-                    probability * 100,
-                    2
+                confidence = float(
+                    probabilities[index] * 100
                 )
 
-            })
-
-
-        # ==================================================
-        # LSTM FEATURE EXPLANATION
-        # ==================================================
-
-        feature_values = input_df.iloc[0].to_dict()
-
-
-        crop_data = pd.read_csv(
-            "datasets/crop_recommendation.csv"
-        )
-
-
-        crop_reference = crop_data[
-            crop_data["label"].str.lower()
-            == recommended_crop.lower()
-        ]
-
-
-        explanation_data = []
-
-
-        if not crop_reference.empty:
-
-            reference_mean = (
-                crop_reference[features]
-                .mean()
-            )
-
-
-            for feature in features:
-
-                user_value = float(
-                    feature_values[feature]
-                )
-
-
-                reference_value = float(
-                    reference_mean[feature]
-                )
-
-
-                difference = abs(
-                    user_value
-                    - reference_value
-                )
-
-
-                explanation_data.append({
-
-                    "feature": feature,
-
-                    "value": round(
-                        user_value,
-                        2
-                    ),
-
-                    "reference": round(
-                        reference_value,
-                        2
-                    ),
-
-                    "difference": round(
-                        difference,
+                top_crops.append({
+                    "crop": crop_name,
+                    "confidence": round(
+                        confidence,
                         2
                     )
-
                 })
 
 
-        else:
+            # ------------------------------------------------
+            # RECOMMENDED CROP
+            # ------------------------------------------------
 
-            for feature in features:
+            recommended_crop = top_crops[0]["crop"]
 
-                explanation_data.append({
+            recommended_confidence = (
+                top_crops[0]["confidence"]
+            )
 
-                    "feature": feature,
 
-                    "value": round(
-                        float(
-                            feature_values[feature]
+            # =================================================
+            # CROP CONDITION ANALYSIS
+            # =================================================
+
+            crop_rows = recommendation_data[
+                recommendation_data["crop"].str.lower()
+                == recommended_crop.lower()
+            ]
+
+            explanation_data = []
+            explanation_points = []
+
+
+            if not crop_rows.empty:
+
+                reference = crop_rows[
+                    features
+                ].mean()
+
+
+                for feature in features:
+
+                    actual_value = float(
+                        input_df.iloc[0][feature]
+                    )
+
+                    reference_value = float(
+                        reference[feature]
+                    )
+
+                    difference = abs(
+                        actual_value -
+                        reference_value
+                    )
+
+
+                    explanation_data.append({
+
+                        "feature": feature,
+
+                        "value": round(
+                            actual_value,
+                            2
                         ),
+
+                        "reference": round(
+                            reference_value,
+                            2
+                        ),
+
+                        "difference": round(
+                            difference,
+                            2
+                        )
+                    })
+
+
+                    explanation_points.append(
+                        f"{feature} = "
+                        f"{actual_value:.2f}, "
+                        f"reference = "
+                        f"{reference_value:.2f}"
+                    )
+
+
+            # =================================================
+            # INVESTMENT ANALYSIS
+            # =================================================
+
+            investment_row = investment_data[
+                investment_data["crop"].str.lower()
+                == recommended_crop.lower()
+            ]
+
+
+            if not investment_row.empty:
+
+                investment_row = (
+                    investment_row.iloc[0]
+                )
+
+                cost_per_acre = float(
+                    investment_row[
+                        "total_cost_per_acre"
+                    ]
+                )
+
+                yield_per_acre = float(
+                    investment_row[
+                        "expected_yield_quintal_per_acre"
+                    ]
+                )
+
+            else:
+
+                cost_per_acre = 0
+
+                yield_per_acre = 0
+
+
+            # =================================================
+            # TOTAL INVESTMENT
+            # =================================================
+
+            total_investment = (
+                cost_per_acre *
+                land_area
+            )
+
+
+            # =================================================
+            # EXPECTED PRODUCTION
+            # =================================================
+
+            expected_production = (
+                yield_per_acre *
+                land_area
+            )
+
+
+            # =================================================
+            # MARKET PRICE
+            # =================================================
+
+            market_rows = market_data[
+                market_data["commodity"].str.lower()
+                == recommended_crop.lower()
+            ]
+
+
+            if not market_rows.empty:
+
+                market_price = float(
+                    market_rows[
+                        "modal_price"
+                    ].mean()
+                )
+
+            else:
+
+                market_price = 0
+
+
+            # =================================================
+            # EXPECTED REVENUE
+            # =================================================
+
+            expected_revenue = (
+                expected_production *
+                market_price
+            )
+
+
+            # =================================================
+            # EXPECTED PROFIT
+            # =================================================
+
+            expected_profit = (
+                expected_revenue -
+                total_investment
+            )
+
+
+            # =================================================
+            # PROFIT MARGIN
+            # =================================================
+
+            if total_investment > 0:
+
+                profit_margin = (
+                    expected_profit /
+                    total_investment
+                ) * 100
+
+            else:
+
+                profit_margin = 0
+
+
+            # =================================================
+            # FINAL RESULT
+            # =================================================
+
+            result = {
+
+                "crop":
+                    recommended_crop,
+
+                "confidence":
+                    recommended_confidence,
+
+                "top_crops":
+                    top_crops,
+
+                # Kept as shap_data because
+                # your existing HTML uses this name.
+                # It is NOT SHAP data.
+                "shap_data":
+                    explanation_data,
+
+                "explanation_points":
+                    explanation_points,
+
+                "land_area":
+                    round(
+                        land_area,
                         2
                     ),
 
-                    "reference": 0,
+                "investment":
+                    round(
+                        total_investment,
+                        2
+                    ),
 
-                    "difference": 0
+                "production":
+                    round(
+                        expected_production,
+                        2
+                    ),
 
-                })
+                "market_price":
+                    round(
+                        market_price,
+                        2
+                    ),
+
+                "revenue":
+                    round(
+                        expected_revenue,
+                        2
+                    ),
+
+                "profit":
+                    round(
+                        expected_profit,
+                        2
+                    ),
+
+                "margin":
+                    round(
+                        profit_margin,
+                        2
+                    )
+            }
 
 
-        # ==================================================
-        # SORT FEATURES
-        # ==================================================
+        except Exception as e:
 
-        explanation_data.sort(
-            key=lambda x: x["difference"]
-        )
-
-
-        # ==================================================
-        # HUMAN READABLE EXPLANATION
-        # ==================================================
-
-        explanation_points = []
-
-        for item in explanation_data[:4]:
-
-            explanation_points.append(
-
-                f'{item["feature"]} value '
-                f'{item["value"]} is close to the '
-                f'recommended {recommended_crop} '
-                f'conditions.'
-
+            print(
+                "Prediction error:",
+                repr(e)
             )
 
-
-        # ==================================================
-        # INVESTMENT DETAILS
-        # ==================================================
-
-        crop_info = investment_data[
-            investment_data["crop"].str.lower()
-            == recommended_crop.lower()
-        ]
+            error = str(e)
 
 
-        if not crop_info.empty:
-
-            crop_info = crop_info.iloc[0]
-
-
-            cost_per_acre = float(
-                crop_info[
-                    "total_cost_per_acre"
-                ]
-            )
-
-
-            yield_per_acre = float(
-                crop_info[
-                    "expected_yield_quintal_per_acre"
-                ]
-            )
-
-
-            total_investment = (
-                cost_per_acre
-                * land_area
-            )
-
-
-            expected_production = (
-                yield_per_acre
-                * land_area
-            )
-
-
-        else:
-
-            cost_per_acre = 0
-
-            yield_per_acre = 0
-
-            total_investment = 0
-
-            expected_production = 0
-
-
-        # ==================================================
-        # MARKET PRICE
-        # ==================================================
-
-        market_info = market_data[
-            market_data["commodity"].str.lower()
-            == recommended_crop.lower()
-        ]
-
-
-        if not market_info.empty:
-
-            market_price = float(
-                market_info["modal_price"].mean()
-            )
-
-        else:
-
-            market_price = 0
-
-
-        # ==================================================
-        # REVENUE
-        # ==================================================
-
-        expected_revenue = (
-            expected_production
-            * market_price
-        )
-
-
-        # ==================================================
-        # PROFIT
-        # ==================================================
-
-        expected_profit = (
-            expected_revenue
-            - total_investment
-        )
-
-
-        # ==================================================
-        # PROFIT MARGIN
-        # ==================================================
-
-        if total_investment > 0:
-
-            profit_margin = (
-                expected_profit
-                / total_investment
-            ) * 100
-
-        else:
-
-            profit_margin = 0
-
-
-        # ==================================================
-        # FINAL RESULT
-        # ==================================================
-
-        result = {
-
-            "crop":
-                recommended_crop,
-
-            "confidence":
-                round(
-                    probabilities[
-                        predicted_index
-                    ] * 100,
-                    2
-                ),
-
-            "top_crops":
-                top_crops,
-
-            "shap_data":
-                explanation_data,
-
-            "explanation_points":
-                explanation_points,
-
-            "land_area":
-                land_area,
-
-            "investment":
-                total_investment,
-
-            "production":
-                expected_production,
-
-            "market_price":
-                market_price,
-
-            "revenue":
-                expected_revenue,
-
-            "profit":
-                expected_profit,
-
-            "margin":
-                profit_margin
-        }
-
+    # =========================================================
+    # SEND RESULT TO HTML
+    # =========================================================
 
     return render_template(
         "index.html",
-        result=result
+        result=result,
+        error=error
     )
 
 
-# ==========================================================
+# ============================================================
 # RUN APPLICATION
-# ==========================================================
+# ============================================================
 
 if __name__ == "__main__":
 
-    print("--------------------------------")
-
-    print(
-        "LSTM CROP RECOMMENDATION SYSTEM"
+    port = int(
+        os.environ.get(
+            "PORT",
+            5000
+        )
     )
-
-    print(
-        "INVESTMENT & PROFIT ANALYSIS"
-    )
-
-    print("--------------------------------")
-
-    print(
-        "Open browser:"
-    )
-
-    print(
-        "http://127.0.0.1:5000"
-    )
-
-    print("--------------------------------")
 
     app.run(
         host="0.0.0.0",
-        port=5000,
-        debug=True
+        port=port
     )
