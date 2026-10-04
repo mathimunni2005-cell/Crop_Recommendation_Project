@@ -1,14 +1,14 @@
 import os
-import joblib
+import pickle
 import numpy as np
 import pandas as pd
 
 from sklearn.preprocessing import StandardScaler, LabelEncoder
 from sklearn.model_selection import train_test_split
-from sklearn.metrics import accuracy_score, classification_report
 
+import tensorflow as tf
 from tensorflow.keras.models import Sequential
-from tensorflow.keras.layers import LSTM, Dense, Dropout, Bidirectional
+from tensorflow.keras.layers import Input, LSTM, Dense, Dropout
 from tensorflow.keras.callbacks import EarlyStopping
 
 
@@ -16,33 +16,35 @@ from tensorflow.keras.callbacks import EarlyStopping
 # SETTINGS
 # ==========================================================
 
-DATASET_PATH = "datasets/crop_recommendation.csv"
+DATA_PATH = "datasets/crop_recommendation.csv"
+
 MODEL_DIR = "models"
 
 SEQUENCE_LENGTH = 3
 
 
 # ==========================================================
-# CREATE MODEL FOLDER
+# CREATE MODEL DIRECTORY
 # ==========================================================
 
-os.makedirs(MODEL_DIR, exist_ok=True)
+os.makedirs(
+    MODEL_DIR,
+    exist_ok=True
+)
 
 
 # ==========================================================
 # LOAD DATASET
 # ==========================================================
 
-data = pd.read_csv(DATASET_PATH)
+data = pd.read_csv(
+    DATA_PATH
+)
 
-print("\n==========================================")
-print("LSTM CROP RECOMMENDATION SYSTEM")
-print("==========================================")
-
-print("\nDataset shape:", data.shape)
-
-print("\nCrop distribution:")
-print(data["label"].value_counts())
+print(
+    "Dataset shape:",
+    data.shape
+)
 
 
 # ==========================================================
@@ -59,20 +61,25 @@ features = [
     "rainfall"
 ]
 
+
 X = data[features].values
+
 y = data["label"].values
 
 
 # ==========================================================
-# ENCODE CROP LABELS
+# LABEL ENCODER
 # ==========================================================
 
 label_encoder = LabelEncoder()
 
 y_encoded = label_encoder.fit_transform(y)
 
-print("\nCrop classes:")
-print(label_encoder.classes_)
+
+print(
+    "Crop classes:",
+    label_encoder.classes_
+)
 
 
 # ==========================================================
@@ -89,6 +96,7 @@ X_scaled = scaler.fit_transform(X)
 # ==========================================================
 
 X_sequences = []
+
 y_sequences = []
 
 
@@ -98,93 +106,109 @@ for crop_class in np.unique(y_encoded):
         y_encoded == crop_class
     )[0]
 
-    crop_data = X_scaled[crop_indices]
+    crop_data = X_scaled[
+        crop_indices
+    ]
 
-    crop_labels = y_encoded[crop_indices]
+    crop_labels = y_encoded[
+        crop_indices
+    ]
 
-    if len(crop_data) < SEQUENCE_LENGTH:
-        continue
 
     for i in range(
         len(crop_data) - SEQUENCE_LENGTH + 1
     ):
 
-        sequence = crop_data[
-            i:i + SEQUENCE_LENGTH
-        ]
+        X_sequences.append(
+            crop_data[
+                i:i + SEQUENCE_LENGTH
+            ]
+        )
 
-        label = crop_labels[
-            i + SEQUENCE_LENGTH - 1
-        ]
-
-        X_sequences.append(sequence)
-        y_sequences.append(label)
-
-
-X_sequences = np.array(X_sequences)
-y_sequences = np.array(y_sequences)
+        y_sequences.append(
+            crop_labels[i + SEQUENCE_LENGTH - 1]
+        )
 
 
-print("\nSequence shape:")
-print(X_sequences.shape)
+X_sequences = np.array(
+    X_sequences
+)
+
+y_sequences = np.array(
+    y_sequences
+)
+
+
+print(
+    "Sequence shape:",
+    X_sequences.shape
+)
 
 
 # ==========================================================
-# TRAIN / TEST SPLIT
+# TRAIN TEST SPLIT
 # ==========================================================
 
 X_train, X_test, y_train, y_test = train_test_split(
+
     X_sequences,
+
     y_sequences,
+
     test_size=0.25,
+
     random_state=42,
+
     stratify=y_sequences
 )
 
 
-print("\nTraining samples:", len(X_train))
-print("Testing samples:", len(X_test))
+print(
+    "Training samples:",
+    len(X_train)
+)
+
+print(
+    "Testing samples:",
+    len(X_test)
+)
 
 
 # ==========================================================
-# BUILD LSTM MODEL
+# LIGHTWEIGHT LSTM MODEL
 # ==========================================================
 
 model = Sequential()
 
+
 model.add(
-    Bidirectional(
-        LSTM(
-            64,
-            return_sequences=True
-        ),
-        input_shape=(
+    Input(
+        shape=(
             SEQUENCE_LENGTH,
             len(features)
         )
     )
 )
 
-model.add(Dropout(0.25))
-
 
 model.add(
-    LSTM(32)
-)
-
-model.add(Dropout(0.20))
-
-
-model.add(
-    Dense(
-        32,
-        activation="relu"
+    LSTM(
+        16,
+        return_sequences=False
     )
 )
 
 
 model.add(
-    Dropout(0.15)
+    Dropout(0.10)
+)
+
+
+model.add(
+    Dense(
+        8,
+        activation="relu"
+    )
 )
 
 
@@ -197,19 +221,23 @@ model.add(
 
 
 # ==========================================================
-# COMPILE
+# COMPILE MODEL
 # ==========================================================
 
 model.compile(
+
     optimizer="adam",
+
     loss="sparse_categorical_crossentropy",
+
     metrics=["accuracy"]
+
 )
 
 
-print("\n==========================================")
-print("MODEL SUMMARY")
-print("==========================================")
+# ==========================================================
+# MODEL SUMMARY
+# ==========================================================
 
 model.summary()
 
@@ -219,145 +247,130 @@ model.summary()
 # ==========================================================
 
 early_stopping = EarlyStopping(
+
     monitor="val_loss",
-    patience=15,
+
+    patience=10,
+
     restore_best_weights=True
+
 )
 
 
 # ==========================================================
-# TRAIN
+# TRAIN MODEL
 # ==========================================================
 
-print("\n==========================================")
-print("TRAINING LSTM")
-print("==========================================")
-
-
 history = model.fit(
+
     X_train,
+
     y_train,
+
     validation_data=(
         X_test,
         y_test
     ),
+
     epochs=100,
+
     batch_size=4,
+
     callbacks=[
         early_stopping
     ],
+
     verbose=1
+
 )
 
 
 # ==========================================================
-# EVALUATION
+# TEST ACCURACY
 # ==========================================================
 
-predictions = model.predict(
+loss, accuracy = model.evaluate(
+
     X_test,
-    verbose=0
-)
 
-predicted_classes = np.argmax(
-    predictions,
-    axis=1
-)
-
-
-accuracy = accuracy_score(
     y_test,
-    predicted_classes
+
+    verbose=0
+
 )
 
 
-print("\n==========================================")
-print("MODEL PERFORMANCE")
-print("==========================================")
-
+print()
 print(
-    f"\nTest Accuracy: {accuracy * 100:.2f}%"
+    "=========================================="
 )
 
-
-print("\nClassification Report:")
+print(
+    f"Test Accuracy: {accuracy * 100:.2f}%"
+)
 
 print(
-    classification_report(
-        y_test,
-        predicted_classes,
-        target_names=label_encoder.classes_,
-        zero_division=0
-    )
+    "=========================================="
 )
 
 
 # ==========================================================
-# SAVE MODEL
+# SAVE LSTM MODEL
 # ==========================================================
 
-model_path = os.path.join(
-    MODEL_DIR,
-    "crop_lstm.keras"
+model.save(
+    "models/crop_lstm.keras"
 )
-
-model.save(model_path)
 
 
 # ==========================================================
 # SAVE SCALER
 # ==========================================================
 
-scaler_path = os.path.join(
-    MODEL_DIR,
-    "scaler.pkl"
-)
+with open(
+    "models/scaler.pkl",
+    "wb"
+) as file:
 
-joblib.dump(
-    scaler,
-    scaler_path
-)
+    pickle.dump(
+        scaler,
+        file
+    )
 
 
 # ==========================================================
 # SAVE LABEL ENCODER
 # ==========================================================
 
-encoder_path = os.path.join(
-    MODEL_DIR,
-    "label_encoder.pkl"
-)
+with open(
+    "models/label_encoder.pkl",
+    "wb"
+) as file:
 
-joblib.dump(
-    label_encoder,
-    encoder_path
-)
+    pickle.dump(
+        label_encoder,
+        file
+    )
 
 
 # ==========================================================
-# FINISHED
+# COMPLETION MESSAGE
 # ==========================================================
 
-print("\n==========================================")
-print("TRAINING COMPLETED")
-print("==========================================")
+print()
 
 print(
-    "\nModel saved:"
+    "LSTM model saved successfully."
 )
-
-print(model_path)
 
 print(
-    "\nScaler saved:"
+    "Model : models/crop_lstm.keras"
 )
-
-print(scaler_path)
 
 print(
-    "\nLabel encoder saved:"
+    "Scaler: models/scaler.pkl"
 )
 
-print(encoder_path)
-
-print("\n==========================================")
+print(
+    "Encoder: models/label_encoder.pkl"
+)
