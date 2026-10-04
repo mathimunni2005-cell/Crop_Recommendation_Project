@@ -1,18 +1,41 @@
+import os
+
+# ==========================================================
+# RENDER / CPU MEMORY OPTIMIZATION
+# ==========================================================
+
+os.environ["TF_NUM_INTRAOP_THREADS"] = "1"
+os.environ["TF_NUM_INTEROP_THREADS"] = "1"
+os.environ["OMP_NUM_THREADS"] = "1"
+
 from flask import Flask, render_template, request
 import pandas as pd
 import numpy as np
 import joblib
+import tensorflow as tf
 from tensorflow.keras.models import load_model
 
+
+# ==========================================================
+# TENSORFLOW THREAD SETTINGS
+# ==========================================================
+
+tf.config.threading.set_intra_op_parallelism_threads(1)
+tf.config.threading.set_inter_op_parallelism_threads(1)
+
+
 app = Flask(__name__)
+
 
 # ==========================================================
 # LOAD TRAINED LSTM MODEL
 # ==========================================================
 
 model = load_model(
-    "models/crop_lstm.keras"
+    "models/crop_lstm.keras",
+    compile=False
 )
+
 
 # ==========================================================
 # LOAD SCALER
@@ -22,6 +45,7 @@ scaler = joblib.load(
     "models/scaler.pkl"
 )
 
+
 # ==========================================================
 # LOAD LABEL ENCODER
 # ==========================================================
@@ -29,6 +53,7 @@ scaler = joblib.load(
 label_encoder = joblib.load(
     "models/label_encoder.pkl"
 )
+
 
 # ==========================================================
 # FEATURES
@@ -46,6 +71,7 @@ features = [
 
 SEQUENCE_LENGTH = 3
 
+
 # ==========================================================
 # LOAD INVESTMENT DATASET
 # ==========================================================
@@ -54,6 +80,7 @@ investment_data = pd.read_csv(
     "datasets/crop_investment.csv"
 )
 
+
 # ==========================================================
 # LOAD MARKET PRICE DATASET
 # ==========================================================
@@ -61,6 +88,7 @@ investment_data = pd.read_csv(
 market_data = pd.read_csv(
     "datasets/market_prices.csv"
 )
+
 
 # ==========================================================
 # HOME PAGE
@@ -101,6 +129,7 @@ def home():
             request.form["land_area"]
         )
 
+
         # ==================================================
         # CREATE INPUT DATAFRAME
         # ==================================================
@@ -118,30 +147,28 @@ def home():
             columns=features
         )
 
+
         # ==================================================
         # SCALE INPUT
         # ==================================================
+        # .values removes the sklearn feature-name warning
+        # ==================================================
 
         input_scaled = scaler.transform(
-            input_df
+            input_df.values
         )
+
 
         # ==================================================
         # CREATE LSTM SEQUENCE
         # ==================================================
-        #
-        # The trained model expects:
-        # (samples, 3 time steps, 7 features)
-        #
-        # For a single farmer input, we repeat the
-        # current conditions for the 3 required steps.
-        #
 
         sequence = np.repeat(
             input_scaled[:, np.newaxis, :],
             SEQUENCE_LENGTH,
             axis=1
         )
+
 
         # ==================================================
         # LSTM PREDICTION
@@ -151,6 +178,7 @@ def home():
             sequence,
             verbose=0
         )[0]
+
 
         # ==================================================
         # GET PREDICTED CROP
@@ -165,6 +193,7 @@ def home():
                 [predicted_index]
             )[0]
         )
+
 
         # ==================================================
         # TOP 3 CROPS
@@ -189,10 +218,12 @@ def home():
                 )
             )
 
+
         probability_data.sort(
             key=lambda x: x[1],
             reverse=True
         )
+
 
         top_crops = []
 
@@ -209,27 +240,27 @@ def home():
 
             })
 
+
         # ==================================================
         # LSTM FEATURE EXPLANATION
         # ==================================================
-        #
-        # This is a simple human-readable explanation.
-        # Tree SHAP is NOT used because the model is LSTM.
-        #
 
         feature_values = input_df.iloc[0].to_dict()
 
-        # Crop-specific approximate comparison
-        crop_rows = crop_data = pd.read_csv(
+
+        crop_data = pd.read_csv(
             "datasets/crop_recommendation.csv"
         )
 
-        crop_reference = crop_rows[
-            crop_rows["label"].str.lower()
+
+        crop_reference = crop_data[
+            crop_data["label"].str.lower()
             == recommended_crop.lower()
         ]
 
+
         explanation_data = []
+
 
         if not crop_reference.empty:
 
@@ -238,20 +269,24 @@ def home():
                 .mean()
             )
 
+
             for feature in features:
 
                 user_value = float(
                     feature_values[feature]
                 )
 
+
                 reference_value = float(
                     reference_mean[feature]
                 )
+
 
                 difference = abs(
                     user_value
                     - reference_value
                 )
+
 
                 explanation_data.append({
 
@@ -274,6 +309,7 @@ def home():
 
                 })
 
+
         else:
 
             for feature in features:
@@ -295,6 +331,7 @@ def home():
 
                 })
 
+
         # ==================================================
         # SORT FEATURES
         # ==================================================
@@ -302,6 +339,7 @@ def home():
         explanation_data.sort(
             key=lambda x: x["difference"]
         )
+
 
         # ==================================================
         # HUMAN READABLE EXPLANATION
@@ -320,6 +358,7 @@ def home():
 
             )
 
+
         # ==================================================
         # INVESTMENT DETAILS
         # ==================================================
@@ -329,9 +368,11 @@ def home():
             == recommended_crop.lower()
         ]
 
+
         if not crop_info.empty:
 
             crop_info = crop_info.iloc[0]
+
 
             cost_per_acre = float(
                 crop_info[
@@ -339,21 +380,25 @@ def home():
                 ]
             )
 
+
             yield_per_acre = float(
                 crop_info[
                     "expected_yield_quintal_per_acre"
                 ]
             )
 
+
             total_investment = (
                 cost_per_acre
                 * land_area
             )
 
+
             expected_production = (
                 yield_per_acre
                 * land_area
             )
+
 
         else:
 
@@ -365,6 +410,7 @@ def home():
 
             expected_production = 0
 
+
         # ==================================================
         # MARKET PRICE
         # ==================================================
@@ -373,6 +419,7 @@ def home():
             market_data["commodity"].str.lower()
             == recommended_crop.lower()
         ]
+
 
         if not market_info.empty:
 
@@ -384,6 +431,7 @@ def home():
 
             market_price = 0
 
+
         # ==================================================
         # REVENUE
         # ==================================================
@@ -393,6 +441,7 @@ def home():
             * market_price
         )
 
+
         # ==================================================
         # PROFIT
         # ==================================================
@@ -401,6 +450,7 @@ def home():
             expected_revenue
             - total_investment
         )
+
 
         # ==================================================
         # PROFIT MARGIN
@@ -416,6 +466,7 @@ def home():
         else:
 
             profit_margin = 0
+
 
         # ==================================================
         # FINAL RESULT
@@ -464,6 +515,7 @@ def home():
             "margin":
                 profit_margin
         }
+
 
     return render_template(
         "index.html",
